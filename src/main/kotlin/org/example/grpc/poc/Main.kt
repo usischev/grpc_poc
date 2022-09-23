@@ -7,7 +7,7 @@ import io.grpc.examples.helloworld.GreeterGrpcKt
 import io.grpc.examples.helloworld.HelloRequest
 import io.grpc.examples.helloworld.HelloResponse
 import io.grpc.netty.NettyServerBuilder
-import kotlinx.coroutines.CoroutineScope
+import io.grpc.stub.StreamObserver
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
@@ -15,23 +15,50 @@ import kotlinx.coroutines.runBlocking
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
-internal class HelloWorldImpl : GreeterGrpcKt.GreeterCoroutineImplBase() {
+internal fun buildHelloResponse(name: String) = HelloResponse
+    .newBuilder()
+    .setMessage("hello, $name".repeat(1024 * 1024 * 5).substring(0, 4194000))
+    .build()
+
+internal class HelloWorldCoroutineImpl : GreeterGrpcKt.GreeterCoroutineImplBase() {
     override suspend fun sayHello(request: HelloRequest): HelloResponse {
         return coroutineScope {
-            HelloResponse
-                .newBuilder()
-                .setMessage("hello, ${request.name}".repeat(1024 * 1024 * 5).substring(0, 4194000))
-                .build()
+            buildHelloResponse(request.name)
         }
     }
 }
 
-internal suspend fun requestCycle(stub: GreeterGrpcKt.GreeterCoroutineStub) {
-    repeat(10) { i ->
-        repeat(100) { j ->
-            val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
-            val response = stub.sayHello(request)
-            println("$i $j ${response.message.length}")
+internal class HelloWorldBlockingImpl : GreeterGrpc.GreeterImplBase() {
+    override fun sayHello(request: HelloRequest, responseObserver: StreamObserver<HelloResponse>) {
+        responseObserver.onNext(buildHelloResponse(request.name))
+        responseObserver.onCompleted()
+    }
+}
+
+internal fun createCoroutineServer(port: Int): Server {
+    return NettyServerBuilder.forPort(port)
+        .maxConnectionAge(1, TimeUnit.SECONDS)
+        .maxConnectionAgeGrace(300, TimeUnit.SECONDS)
+        .addService(HelloWorldCoroutineImpl())
+        .build()
+}
+
+internal fun createBlockingServer(port: Int): Server {
+    return NettyServerBuilder.forPort(port)
+        .maxConnectionAge(1, TimeUnit.SECONDS)
+        .maxConnectionAgeGrace(300, TimeUnit.SECONDS)
+        .addService(HelloWorldBlockingImpl())
+        .build()
+}
+
+internal fun requestCycle(stub: GreeterGrpcKt.GreeterCoroutineStub) {
+    runBlocking {
+        repeat(10) { i ->
+            repeat(100) { j ->
+                val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
+                val response = stub.sayHello(request)
+                println("$i $j ${response.message.length}")
+            }
         }
     }
 }
@@ -46,13 +73,15 @@ internal fun blockingRequestCycle(stub: GreeterGrpc.GreeterBlockingStub) {
     }
 }
 
-internal suspend fun asyncRequestCycle(scope: CoroutineScope, stub: GreeterGrpcKt.GreeterCoroutineStub) {
-    repeat(10) { i ->
-        scope.launch(Dispatchers.IO) {
-            repeat(100) { j ->
-                val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
-                val response = stub.sayHello(request)
-                println("$i $j ${response.message.length}")
+internal fun asyncRequestCycle(stub: GreeterGrpcKt.GreeterCoroutineStub) {
+    runBlocking {
+        repeat(10) { i ->
+            launch(Dispatchers.IO) {
+                repeat(100) { j ->
+                    val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
+                    val response = stub.sayHello(request)
+                    println("$i $j ${response.message.length}")
+                }
             }
         }
     }
@@ -61,11 +90,8 @@ internal suspend fun asyncRequestCycle(scope: CoroutineScope, stub: GreeterGrpcK
 fun main() {
     val port = 50051
 
-    val server: Server = NettyServerBuilder.forPort(port)
-        .maxConnectionAge(1, TimeUnit.SECONDS)
-        .maxConnectionAgeGrace(300, TimeUnit.SECONDS)
-        .addService(HelloWorldImpl())
-        .build()
+//    val server: Server = createCoroutineServer(port)
+    val server: Server = createBlockingServer(port)
 
     server.start()
 
@@ -74,13 +100,11 @@ fun main() {
             .forTarget("localhost:$port")
             .defaultLoadBalancingPolicy("round_robin").usePlaintext()
             .build()
-    val coroutineStub = GreeterGrpcKt.GreeterCoroutineStub(channel)
+//    val coroutineStub = GreeterGrpcKt.GreeterCoroutineStub(channel)
     val blockingStub = GreeterGrpc.newBlockingStub(channel)
 
-    runBlocking {
-//        asyncRequestCycle(this, coroutineStub)
-//        requestCycle(coroutineStub)
-    }
+//    asyncRequestCycle(coroutineStub)
+//    requestCycle(coroutineStub)
     blockingRequestCycle(blockingStub)
 
     channel.shutdown()
