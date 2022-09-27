@@ -1,9 +1,9 @@
 # grpc_poc
 
-Reproducing a maxConnectionAge bug in grpc-java. Run `main()` in `Main.kt`. Exception is thrown not on every run but
-pretty often. You can comment the line calling `blockingRequestCycle` and uncomment one of `asyncRequestCycle` or
-`requestCycle`. Any of these three functions eventually throw `StatusException`, and `asyncRequestCycle` seems to do it
-more often.
+Reproducing a maxConnectionAge bug in grpc-java. Run `main()` in `Main.kt` (or `./gradlew run` from command line).
+Exception is thrown not on every run but pretty often. You can comment the line calling `blockingRequestCycle` and
+uncomment one of `asyncRequestCycle` or `requestCycle`. Any of these three functions eventually throw `StatusException`,
+and `asyncRequestCycle` seems to do it more often.
 
 When GRPC server closes a connection because of max connection age, it sends `GOAWAY` HTTP2 packages to connected
 clients and stops accepting new requests. Then it finishes processing requests it has already received, then sends

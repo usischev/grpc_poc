@@ -30,6 +30,10 @@ plugins {
 group = "org.example"
 version = "1.0-SNAPSHOT"
 
+application {
+    mainClass.set("org.example.grpc.poc.MainKt")
+}
+
 sourceSets {
     val main by getting { }
     main.java.srcDirs("build/generated/source/proto/main/grpc")
