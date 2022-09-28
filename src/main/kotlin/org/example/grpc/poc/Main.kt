@@ -12,6 +12,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.launch
 import kotlinx.coroutines.runBlocking
+import java.time.LocalDateTime
 import java.util.UUID
 import java.util.concurrent.TimeUnit
 
@@ -57,7 +58,7 @@ internal fun requestCycle(stub: GreeterGrpcKt.GreeterCoroutineStub) {
             repeat(100) { j ->
                 val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
                 val response = stub.sayHello(request)
-                println("$i $j ${response.message.length}")
+                println("${LocalDateTime.now()} $i $j ${response.message.length}")
             }
         }
     }
@@ -68,7 +69,7 @@ internal fun blockingRequestCycle(stub: GreeterGrpc.GreeterBlockingStub) {
         repeat(100) { j ->
             val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
             val response = stub.sayHello(request)
-            println("$i $j ${response.message.length}")
+            println("${LocalDateTime.now()} $i $j ${response.message.length}")
         }
     }
 }
@@ -80,7 +81,7 @@ internal fun asyncRequestCycle(stub: GreeterGrpcKt.GreeterCoroutineStub) {
                 repeat(100) { j ->
                     val request = HelloRequest.newBuilder().setName(UUID.randomUUID().toString()).build()
                     val response = stub.sayHello(request)
-                    println("$i $j ${response.message.length}")
+                    println("${LocalDateTime.now()} $i $j ${response.message.length}")
                 }
             }
         }
@@ -103,9 +104,11 @@ fun main() {
 //    val coroutineStub = GreeterGrpcKt.GreeterCoroutineStub(channel)
     val blockingStub = GreeterGrpc.newBlockingStub(channel)
 
+    println("${LocalDateTime.now()} STARTING")
 //    asyncRequestCycle(coroutineStub)
 //    requestCycle(coroutineStub)
     blockingRequestCycle(blockingStub)
+    println("${LocalDateTime.now()} FINISHING")
 
     channel.shutdown()
     server.shutdown()
